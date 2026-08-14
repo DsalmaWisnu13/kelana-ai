@@ -1,69 +1,64 @@
+from fastapi import FastAPI
+from pydantic import BaseModel
 from services.trip_service import (
     calculate_daily_budget,
     get_trip_category,
-    get_recommended_places,
-    get_transportation,
-    get_travel_season
+    get_transportation
 )
 
 
-def print_trip_summary(
-    destination,
-    days,
-    budget,
-    currency,
-    category,
-    daily_budget,
-    month_travel,
-    season,
-    transportation,
-    recommended_places
-):
-    print("==============================")
-    print("KelanaAI")
-    print("==============================")
-
-    print(f"Destination     = {destination}")
-    print(f"Days            = {days}")
-    print(f"Budget          = {budget} {currency}")
-    print(f"Category        = {category}")
-    print(f"Travel Month    = {month_travel}")
-    print(f"Season = {season}")
-    print(f"Daily Budget    = {daily_budget} {currency}/Day")
-    print(f"Recommended Transportation: {transportation}")
-
-    print("\nRecommended Places")
-
-    for place in recommended_places:
-        print(f"- {place}")
+class TripRequest(BaseModel):
+    destination: str
+    days: int
+    budget: float
+    travel_style: str
 
 
-# Input user
-destination = input("Destination: ")
-country = input("Country: ")
-days = int(input("Days: "))
-budget = float(input("Budget: "))
-currency = input("Currency: ")
-month_travel = input("Travel Month: ")
+# FastAPI validates the JSON body against this model
+# If a field is missing or wrong type, it returns 422 automatically
+
+app = FastAPI()
 
 
-# Calculate trip information
-daily_budget = calculate_daily_budget(budget, days)
-category = get_trip_category(budget)
-recommended_places = get_recommended_places(destination)
-transportation = get_transportation(category)
-season = get_travel_season(month_travel)
+# a GET endpoint at the root path
+@app.get("/")
+def home():
+    return {
+        "message": "Welcome to KelanaAI"
+    }
 
-# Display trip summary
-print_trip_summary(
-    destination,
-    days,
-    budget,
-    currency,
-    category,
-    daily_budget,
-    month_travel,
-    season,
-    transportation,
-    recommended_places
-)
+@app.get("/health")
+def health():
+    return {
+        "status": "Ok"
+    }
+
+@app.get("/api/v1/trip-categories")
+def categories():
+    return {
+        "Backpacker",
+        "Standard",
+        "Luxury"
+    }
+
+
+# POST endpoint — receives JSON, returns JSON
+@app.post("/api/v1/trips")
+def create_trip(request: TripRequest):
+    daily_budget = calculate_daily_budget(
+        request.budget, request.days
+    )
+
+    category = get_trip_category(
+        request.budget
+    )
+
+    transportation = get_transportation(category)
+
+    return {
+        "destination": request.destination,
+        "budget": request.budget,
+        "daily_budget": daily_budget,
+        "category": category,
+        "recommendation_transport": transportation,
+    }
