@@ -10,6 +10,16 @@ def get_trip_category(budget):
     else:
         return "Luxury"
 
+def get_travel_season(month):
+    month_clean = month.strip().lower()
+    
+    if month == "December" or month == 12:
+        return "Peak Season"
+    elif month == "June" or month == 6:
+        return "Holiday Season"
+    else:
+        return "Regular Season"
+
 def get_transportation(category):
     if category == "Backpacker":
         return "Bus"
