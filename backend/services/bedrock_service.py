@@ -78,37 +78,91 @@ def get_ai_recommendation(
     str
         The model's itinerary text.
     """
-    prompt = (f"""
-        You are an experienced travel planner.
+    prompt = f"""
+    You are an experienced and friendly travel planner.
 
-        Create a detailed {days}-day travel plan.
+    Create a practical {days}-day travel itinerary for the traveler.
 
-        Trip Details:
-        - Destination: {destination}
-        - Budget: USD {budget}
-        - Number of Days: {days}
-        - Travel Style: {travel_style}
+    TRIP DETAILS:
+    - Destination: {destination}
+    - Total Budget: USD {budget}
+    - Number of Days: {days}
+    - Travel Style: {travel_style}
 
-        For each day, divide the itinerary into three sections:
+    IMPORTANT RULES:
+    1. The budget provided is the TOTAL trip budget, not the daily budget.
+    2. Keep recommendations realistic for the travel style and destination.
+    3. Calculate the estimated daily budget as total budget divided by number of days.
+    4. Do not invent exact prices when you are uncertain. Use "Varies" or an approximate range.
+    5. Keep each activity description concise: 1-2 sentences.
+    6. Prioritize practical and geographically reasonable activities.
+    7. Do not repeat the same attraction unnecessarily.
+    8. Use simple Markdown only.
+    9. Do not add a long introduction or conclusion.
 
-        ### Morning Activities
-        - Provide 2-3 activities for the morning.
+    FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
 
-        ### Afternoon Activities
-        - Include cultural sites, local experiences, or other activities.
+    # {days}-Day {travel_style} Travel Plan in {destination}
 
-        ### Evening Activities
-        - Suggest evening spots, dinner, entertainment, or nightlife.
+    ## Estimated Daily Budget
 
-        Also include:
-        - Estimated daily budget
-        - Local food recommendations
-        - Transportation suggestions
+    USD {budget / days:.2f}
 
-        Please format your response using Markdown with clear headings and bullet points.
-        """
-    )
+    ## Day 1
 
+    ### Morning Activities
+
+    #### Activity 1: [Activity Name]
+    - Cost: [Estimated cost]
+    - Description: [Short description]
+
+    #### Activity 2: [Activity Name]
+    - Cost: [Estimated cost]
+    - Description: [Short description]
+
+    ### Afternoon Activities
+
+    #### Activity 1: [Activity Name]
+    - Cost: [Estimated cost]
+    - Description: [Short description]
+
+    #### Activity 2: [Activity Name]
+    - Cost: [Estimated cost]
+    - Description: [Short description]
+
+    ### Evening Activities
+
+    #### Activity 1: [Activity Name]
+    - Cost: [Estimated cost]
+    - Description: [Short description]
+
+    #### Activity 2: [Activity Name]
+    - Cost: [Estimated cost]
+    - Description: [Short description]
+
+    Repeat the same Day structure for all remaining days.
+
+    After all days, provide:
+
+    ## Transportation Suggestions
+
+    - [Transportation option]&#58; [Short explanation]
+
+    ## Local Food Recommendations
+
+    - [Food]&#58; [Short explanation]
+    - [Food]&#58; [Short explanation]
+    - [Food]&#58; [Short explanation]
+
+    IMPORTANT:
+    - Keep the exact heading structure above.
+    - Use "## Day X" for each day.
+    - Use "### Morning Activities", "### Afternoon Activities", and "### Evening Activities".
+    - Use "#### Activity X: Activity Name" for activities.
+    - Do not use tables.
+    - Do not use HTML.
+    - Do not wrap the response in a code block.
+    """
     client = get_bedrock_client()
 
     # Amazon Nova / Titan converse-compatible payload
