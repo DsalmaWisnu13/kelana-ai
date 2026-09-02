@@ -9,6 +9,7 @@ from services.trip_service import (
     get_trip_category,
 )
 from services.bedrock_service import get_ai_recommendation
+from services.kb_service import ask_knowledge_base
 from services.auth_service import (
     hash_password,
     verify_password,
@@ -37,6 +38,8 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class AssistantRequest(BaseModel):
+    question: str
 
 app = FastAPI()
 
@@ -95,6 +98,17 @@ def health():
     return {
         "status": "Ok"
     }
+
+@app.post("/api/v1/assistant")
+def assistant(request: AssistantRequest):
+    try:
+        result = ask_knowledge_base(request.question)
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Knowledge Base error: {str(e)}",
+        )
 
 
 @app.get("/api/v1/trip-categories")
