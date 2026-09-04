@@ -8,7 +8,10 @@ from services.trip_service import (
     calculate_daily_budget,
     get_trip_category,
 )
-from services.bedrock_service import get_ai_recommendation
+from services.bedrock_service import (
+    get_ai_recommendation,
+    get_ai_chat_response,
+)
 from services.kb_service import ask_knowledge_base
 from services.auth_service import (
     hash_password,
@@ -16,10 +19,24 @@ from services.auth_service import (
     create_access_token,
     decode_access_token,
 )
+from services.conversation_service import (
+    create_conversation,
+    get_user_conversations,
+    get_conversation,
+    get_messages,
+    save_message,
+)
+
 from database import init_db, SessionLocal
 from models.trip import Trip
 from models.user import User
+from models.conversation import Conversation
+from models.message import Message
 
+
+# =========================
+# REQUEST MODELS
+# =========================
 
 class TripRequest(BaseModel):
     destination: str
@@ -38,8 +55,18 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+
 class AssistantRequest(BaseModel):
     question: str
+
+
+class MessageRequest(BaseModel):
+    content: str
+
+
+# =========================
+# APP
+# =========================
 
 app = FastAPI()
 
@@ -56,6 +83,23 @@ app.add_middleware(
 
 security = HTTPBearer()
 
+
+# =========================
+# DATABASE DEPENDENCY
+# =========================
+
+def get_db():
+    db = SessionLocal()
+
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# =========================
+# AUTHENTICATION
+# =========================
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -82,9 +126,14 @@ def get_current_user(
             )
 
         return user
+
     finally:
         db.close()
 
+
+# =========================
+# GENERAL
+# =========================
 
 @app.get("/")
 def home():
@@ -99,17 +148,28 @@ def health():
         "status": "Ok"
     }
 
+
+# =========================
+# RAG ASSISTANT
+# =========================
+
 @app.post("/api/v1/assistant")
 def assistant(request: AssistantRequest):
     try:
         result = ask_knowledge_base(request.question)
+
         return result
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Knowledge Base error: {str(e)}",
         )
 
+
+# =========================
+# TRIP INFORMATION
+# =========================
 
 @app.get("/api/v1/trip-categories")
 def categories():
@@ -275,6 +335,7 @@ def create_trip(
         db.refresh(trip)
 
         return trip
+
     finally:
         db.close()
 
@@ -293,6 +354,7 @@ def list_trips(
         )
 
         return trips
+
     finally:
         db.close()
 
@@ -321,6 +383,7 @@ def get_trip(
             )
 
         return trip
+
     finally:
         db.close()
 
@@ -411,3 +474,157 @@ def delete_trip(
 
     finally:
         db.close()
+
+
+# =========================
+# CONVERSATIONS
+# =========================
+
+@app.post("/api/v1/conversations", status_code=201)
+def create_new_conversation(
+    user: User = Depends(get_current_user),
+    db = Depends(get_db),
+):
+    conversation = create_conversation(
+        db,
+        user.id,
+    )
+
+    return {
+        "conversation_id": conversation.id,
+        "title": conversation.title,
+        "created_at": conversation.created_at,
+    }
+
+
+@app.get("/api/v1/conversations")
+def list_conversations(
+    user: User = Depends(get_current_user),
+    db = Depends(get_db),
+):
+    conversations = get_user_conversations(
+        db,
+        user.id,
+    )
+
+    return [
+        {
+            "id": conversation.id,
+            "title": conversation.title,
+            "created_at": conversation.created_at,
+        }
+        for conversation in conversations
+    ]
+
+
+@app.get("/api/v1/conversations/{conversation_id}/messages")
+def list_conversation_messages(
+    conversation_id: int,
+    user: User = Depends(get_current_user),
+    db = Depends(get_db),
+):
+    conversation = get_conversation(
+        db,
+        conversation_id,
+        user.id,
+    )
+
+    if conversation is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found",
+        )
+
+    messages = get_messages(
+        db,
+        conversation_id,
+    )
+
+    return [
+        {
+            "id": message.id,
+            "role": message.role,
+            "content": message.content,
+            "created_at": message.created_at,
+        }
+        for message in messages
+    ]
+
+
+# =========================
+# SEND MESSAGE + MEMORY
+# =========================
+
+@app.post("/api/v1/conversations/{conversation_id}/messages")
+def send_message(
+    conversation_id: int,
+    request: MessageRequest,
+    user: User = Depends(get_current_user),
+    db = Depends(get_db),
+):
+    conversation = get_conversation(
+        db,
+        conversation_id,
+        user.id,
+    )
+
+    if conversation is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found",
+        )
+
+    if not request.content.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Message cannot be empty",
+        )
+
+    # 1. Save user message
+    save_message(
+        db,
+        conversation_id,
+        "user",
+        request.content.strip(),
+    )
+
+    # 2. Load entire conversation history
+    history = get_messages(
+        db,
+        conversation_id,
+    )
+
+    # 3. Build context for Bedrock
+    messages = [
+        {
+            "role": message.role,
+            "content": message.content,
+        }
+        for message in history
+    ]
+
+    # 4. Generate context-aware AI response
+    try:
+        answer = get_ai_chat_response(messages)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI response error: {str(e)}",
+        )
+
+    # 5. Save AI response
+    ai_message = save_message(
+        db,
+        conversation_id,
+        "assistant",
+        answer,
+    )
+
+    # 6. Return response
+    return {
+        "conversation_id": conversation_id,
+        "answer": answer,
+        "message_id": ai_message.id,
+        "created_at": ai_message.created_at,
+    }

@@ -1,9 +1,6 @@
 import os
 import json
 import boto3
-from botocore.auth import SigV4Auth
-from botocore.awsrequest import AWSRequest
-from botocore.credentials import Credentials
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,10 +18,6 @@ def get_bedrock_client() -> boto3.client:
     """
     Create and return a boto3 Bedrock Runtime client authenticated via
     the bearer token stored in AWS_BEARER_TOKEN_BEDROCK.
-
-    The token is a base-64 encoded string that encodes temporary
-    Bedrock API key credentials. boto3 accepts it through a custom
-    HTTP session using botocore's token provider mechanism.
     """
     if not AWS_BEARER_TOKEN:
         raise ValueError(
@@ -32,19 +25,21 @@ def get_bedrock_client() -> boto3.client:
             "Please add it to your .env file."
         )
 
-    # Build the client with the bearer token injected as an HTTP header via
-    # a custom event handler so it is sent on every request.
     session = boto3.Session()
+
     client = session.client(
         service_name="bedrock-runtime",
         region_name=AWS_REGION,
     )
 
     # Attach the bearer token to every outgoing request.
-    def _inject_bearer_token(request, **kwargs):  # noqa: ANN001
+    def _inject_bearer_token(request, **kwargs):
         request.headers["Authorization"] = f"Bearer {AWS_BEARER_TOKEN}"
 
-    client.meta.events.register("before-send.bedrock-runtime.*", _inject_bearer_token)
+    client.meta.events.register(
+        "before-send.bedrock-runtime.*",
+        _inject_bearer_token
+    )
 
     return client
 
@@ -61,23 +56,8 @@ def get_ai_recommendation(
 ) -> str:
     """
     Call Amazon Bedrock and return an AI-generated travel itinerary.
-
-    Parameters
-    ----------
-    destination : str
-        The travel destination (e.g. "Bali, Indonesia").
-    days : int
-        Number of days for the trip.
-    budget : float
-        Total budget in USD.
-    travel_style : str
-        Travel style description (e.g. "adventure", "luxury", "backpacker").
-
-    Returns
-    -------
-    str
-        The model's itinerary text.
     """
+
     prompt = f"""
     You are an experienced and friendly travel planner.
 
@@ -163,9 +143,9 @@ def get_ai_recommendation(
     - Do not use HTML.
     - Do not wrap the response in a code block.
     """
+
     client = get_bedrock_client()
 
-    # Amazon Nova / Titan converse-compatible payload
     body = json.dumps(
         {
             "messages": [
@@ -186,9 +166,94 @@ def get_ai_recommendation(
 
     response_body = json.loads(response["body"].read())
 
-    # Nova models return output under output.message.content[0].text
     try:
         return response_body["output"]["message"]["content"][0]["text"]
     except (KeyError, IndexError):
-        # Fallback for other model response shapes
+        return str(response_body)
+
+
+# ---------------------------------------------------------------------------
+# AI conversational chat
+# ---------------------------------------------------------------------------
+
+def get_ai_chat_response(messages: list[dict[str, str]]) -> str:
+    """
+    Call Amazon Bedrock with conversation history and return
+    an AI-generated conversational response.
+    """
+
+    system_prompt = """
+    You are KelanaAI, a friendly and helpful AI travel assistant.
+
+    Your job is to help users with:
+    - travel planning
+    - destinations
+    - transportation
+    - activities
+    - local food
+    - travel budgets
+    - travel-related questions
+
+    IMPORTANT RULES:
+    1. Use the previous conversation messages to understand context.
+    2. If the user asks a follow-up question, connect it to the previous messages.
+    3. Do not ask the user to repeat information that is already available
+       in the conversation history.
+    4. Give practical and concise answers.
+    5. If information is uncertain, say so instead of inventing facts.
+    6. Answer naturally and conversationally.
+    """
+
+    client = get_bedrock_client()
+
+    formatted_messages = []
+
+    for message in messages:
+        role = message["role"]
+
+        if role not in ["user", "assistant"]:
+            continue
+
+        formatted_messages.append(
+            {
+                "role": role,
+                "content": [
+                    {
+                        "text": message["content"]
+                    }
+                ],
+            }
+        )
+
+    if formatted_messages:
+        formatted_messages.insert(
+            0,
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "text": system_prompt
+                    }
+                ],
+            },
+        )
+
+    body = json.dumps(
+        {
+            "messages": formatted_messages,
+        }
+    )
+
+    response = client.invoke_model(
+        modelId=MODEL_ID,
+        contentType="application/json",
+        accept="application/json",
+        body=body,
+    )
+
+    response_body = json.loads(response["body"].read())
+
+    try:
+        return response_body["output"]["message"]["content"][0]["text"]
+    except (KeyError, IndexError):
         return str(response_body)
