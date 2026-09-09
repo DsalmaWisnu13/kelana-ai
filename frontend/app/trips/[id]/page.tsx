@@ -1,20 +1,86 @@
+"use client";
+
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { getTrip } from "@/services/tripService";
 import { Trip } from "@/types/trip";
 
-interface TripDetailPageProps {
-  params: Promise<{
-    id: string;
-  }>;
-}
+export default function TripDetailPage() {
+  const params = useParams();
+  const id = Number(params.id);
 
-export default async function TripDetailPage({
-  params,
-}: TripDetailPageProps) {
-  const { id } = await params;
+  const [trip, setTrip] = useState<Trip | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const trip: Trip = await getTrip(Number(id));
+  useEffect(() => {
+    async function loadTrip() {
+      try {
+        setLoading(true);
+        setError("");
+
+        if (!id || Number.isNaN(id)) {
+          throw new Error("Invalid trip ID");
+        }
+
+        const data = await getTrip(id);
+        setTrip(data);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load trip"
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadTrip();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F7F9FC] px-5">
+        <div className="text-center">
+          <div className="text-5xl">✈️</div>
+          <h1 className="mt-4 text-xl font-black text-slate-950">
+            Loading your trip...
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            KelanaAI is getting your itinerary ready.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (error || !trip) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F7F9FC] px-5">
+        <div className="w-full max-w-md rounded-[2rem] border border-red-100 bg-white p-8 text-center shadow-xl">
+          <div className="text-5xl">😵</div>
+
+          <h1 className="mt-4 text-2xl font-black text-slate-950">
+            This page couldn’t load
+          </h1>
+
+          <p className="mt-3 text-sm leading-6 text-slate-500">
+            {error || "We couldn't find this trip."}
+          </p>
+
+          <Link
+            href="/trips"
+            className="mt-6 inline-flex rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+          >
+            ← Back to Trip History
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#F7F9FC] px-5 py-10 text-slate-900">
@@ -62,7 +128,6 @@ export default async function TripDetailPage({
 
             {/* Destination */}
             <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md">
-
               <div className="flex items-center gap-4">
 
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-2xl">
@@ -80,12 +145,10 @@ export default async function TripDetailPage({
                 </div>
 
               </div>
-
             </div>
 
             {/* Budget */}
             <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md">
-
               <div className="flex items-center gap-4">
 
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-2xl">
@@ -103,12 +166,10 @@ export default async function TripDetailPage({
                 </div>
 
               </div>
-
             </div>
 
             {/* Category */}
             <div className="rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50 to-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md">
-
               <div className="flex items-center gap-4">
 
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-purple-100 text-2xl">
@@ -126,12 +187,10 @@ export default async function TripDetailPage({
                 </div>
 
               </div>
-
             </div>
 
             {/* Travel Style */}
             <div className="rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 to-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md">
-
               <div className="flex items-center gap-4">
 
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-100 text-2xl">
@@ -149,7 +208,6 @@ export default async function TripDetailPage({
                 </div>
 
               </div>
-
             </div>
 
           </div>
@@ -179,7 +237,6 @@ export default async function TripDetailPage({
 
               <ReactMarkdown
                 components={{
-
                   h1: ({ children }) => (
                     <h1 className="mb-5 text-2xl font-black leading-tight text-slate-950">
                       {children}
@@ -249,7 +306,6 @@ export default async function TripDetailPage({
               </ReactMarkdown>
 
             </article>
-
           </div>
 
         </div>
