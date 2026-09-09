@@ -1,8 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import ReactMarkdown from "react-markdown";
 import { generateTrip } from "@/services/tripService";
 
 interface TripRequest {
@@ -10,17 +9,6 @@ interface TripRequest {
   days: number;
   budget: number;
   travel_style: string;
-}
-
-interface TripResult {
-  id: number;
-  destination: string;
-  days: number;
-  budget: number;
-  category: string;
-  daily_budget: number;
-  ai_recommendation: string;
-  created_at: string;
 }
 
 const travelStyles = [
@@ -62,6 +50,12 @@ export default function Home() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    setIsLoggedIn(!!token);
+  }, []);
 
   function handleInputChange(
     e: React.ChangeEvent<HTMLInputElement>
@@ -92,6 +86,11 @@ export default function Home() {
     e: FormEvent<HTMLFormElement>
   ) {
     e.preventDefault();
+
+    if (!isLoggedIn) {
+      router.push("/login");
+      return;
+    }
 
     if (!form.destination.trim()) {
       setError("Please enter your destination.");
@@ -124,7 +123,9 @@ export default function Home() {
         travel_style: form.travel_style,
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await new Promise((resolve) =>
+        setTimeout(resolve, 5000)
+      );
 
       router.push("/trips");
     } catch (err) {
@@ -154,15 +155,19 @@ export default function Home() {
       </div>
 
       {/* Navbar */}
-      <nav className="relative z-10 border-b border-slate-200/70 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
+      <nav className="relative z-10 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
 
-          <div className="flex items-center gap-3">
+          {/* Logo */}
+          <button
+            onClick={() => router.push("/")}
+            className="flex items-center gap-3"
+          >
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-xl shadow-lg shadow-blue-600/20">
               ✈️
             </div>
 
-            <div>
+            <div className="text-left">
               <h1 className="text-lg font-extrabold tracking-tight">
                 Kelana<span className="text-blue-600">AI</span>
               </h1>
@@ -171,13 +176,79 @@ export default function Home() {
                 AI Travel Planner
               </p>
             </div>
+          </button>
+
+          {/* Navigation */}
+          <div className="hidden items-center gap-1 md:flex">
+
+            <button
+              onClick={() => router.push("/")}
+              className="rounded-xl bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700"
+            >
+              Plan Trip
+            </button>
+
+            <button
+              onClick={() => router.push("/chat")}
+              className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+            >
+              💬 Chat AI
+            </button>
+
+            <button
+              onClick={() => router.push("/trips")}
+              className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+            >
+              📋 Trip History
+            </button>
+
           </div>
 
-          <div className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            AI Ready
-          </div>
+          {/* Account */}
+          {isLoggedIn ? (
+            <button
+              onClick={() => {
+                localStorage.removeItem("access_token");
+                setIsLoggedIn(false);
+                router.push("/");
+              }}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              👤 Account
+            </button>
+          ) : (
+            <button
+              onClick={() => router.push("/login")}
+              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700"
+            >
+              Sign In
+            </button>
+          )}
 
+        </div>
+
+        {/* Mobile Navigation */}
+        <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-5 pb-3 md:hidden sm:px-8">
+          <button
+            onClick={() => router.push("/")}
+            className="whitespace-nowrap rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700"
+          >
+            ✈️ Plan Trip
+          </button>
+
+          <button
+            onClick={() => router.push("/chat")}
+            className="whitespace-nowrap rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600"
+          >
+            💬 Chat AI
+          </button>
+
+          <button
+            onClick={() => router.push("/trips")}
+            className="whitespace-nowrap rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600"
+          >
+            📋 History
+          </button>
         </div>
       </nav>
 
@@ -206,7 +277,7 @@ export default function Home() {
 
         </section>
 
-        {/* Planner Form */}
+        {/* Planner */}
         <section className="mx-auto mt-10 max-w-2xl">
 
           <form
@@ -393,6 +464,19 @@ export default function Home() {
 
               </fieldset>
 
+              {/* Login Notice */}
+              {!isLoggedIn && (
+                <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                  <p className="text-sm font-semibold text-blue-800">
+                    🔐 Sign in to save your travel plans
+                  </p>
+
+                  <p className="mt-1 text-xs leading-5 text-blue-600">
+                    Your itinerary will be saved to your personal trip history.
+                  </p>
+                </div>
+              )}
+
               {/* Error */}
               {error && (
                 <div
@@ -435,8 +519,10 @@ export default function Home() {
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                     Generating itinerary...
                   </>
-                ) : (
+                ) : isLoggedIn ? (
                   <>✨ Generate My Trip</>
+                ) : (
+                  <>🔐 Sign In to Generate</>
                 )}
 
               </button>
