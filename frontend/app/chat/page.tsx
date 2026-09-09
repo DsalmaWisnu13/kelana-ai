@@ -15,7 +15,8 @@ type Message = {
   created_at: string;
 };
 
-const API_URL = "http://localhost:8000";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);

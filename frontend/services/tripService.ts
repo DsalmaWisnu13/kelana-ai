@@ -10,7 +10,7 @@ function getAuthHeaders() {
 }
 
 export async function getTrips() {
-  const res = await fetch(`${API_URL}/trips`, {
+  const res = await fetch(`${API_URL}/api/v1/trips`, {
     headers: getAuthHeaders(),
   });
 
@@ -22,7 +22,7 @@ export async function getTrips() {
 }
 
 export async function getTrip(id: number) {
-  const res = await fetch(`${API_URL}/trips/${id}`, {
+  const res = await fetch(`${API_URL}/api/v1/trips/${id}`, {
     headers: getAuthHeaders(),
   });
 
@@ -39,7 +39,7 @@ export async function generateTrip(data: {
   budget: number;
   travel_style: string;
 }) {
-  const res = await fetch(`${API_URL}/trips`, {
+  const res = await fetch(`${API_URL}/api/v1/trips`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
